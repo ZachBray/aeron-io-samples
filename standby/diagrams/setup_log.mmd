@@ -1,0 +1,44 @@
+sequenceDiagram
+    autonumber
+    box Arbitrary node
+        participant arb_cm as Consensus Module
+        participant arb_archive as Archive
+    end
+
+    box Standby node
+        participant standby_standby as Cluster Standby
+        participant standby_log_image as Log Image
+        participant standby_archive as Archive
+    end
+
+    note over standby_standby: state=SETUP_LOG
+    note over standby_standby: get logRecordingId from the recording.log
+    note over standby_standby: create a temp subscription<br/>endpoint=ctx.catchupChannel<br/>stream=ctx.logStreamId (100)
+
+    alt
+        standby_standby ->> standby_archive: StartRecordingRequest2
+        standby_archive ->> standby_standby: ControlResponse(OK)
+    else
+        standby_standby ->> standby_archive: ExtendRecordingRequest2
+        standby_archive ->> standby_standby: ControlResponse(OK)
+    end
+
+    standby_standby ->> arb_archive: BoundedReplayRequest
+    note over arb_archive: endpoint=from BackupResponse<br/>stream=ctx.cAC.controlRequestStreamId (10)
+    arb_archive ->> standby_standby: ControlResponse(OK)
+    note over arb_archive: endpoint=ctx.clusterArchiveResponseEndpoint<br/>stream=ctx.cAC.controlRequestStreamId (10)
+
+    par source sends data
+        loop
+            arb_archive ->> standby_log_image: SessionMessage|SessionOpen|ClusterAction|...
+            note over arb_archive, standby_standby: endpoint=ctx.catchupChannel<br/>stream=ctx.logStreamId (100)
+        end
+    and archive records
+        standby_archive -->> standby_log_image: poll()
+    and change state
+        alt consensus state == INIT
+            standby_standby->>standby_standby: state=RECOVER_CONSENSUS_MODULE
+        else
+            standby_standby->>standby_standby: state=LIVE_LOG_REPLAY
+        end
+    end

@@ -1,0 +1,21 @@
+sequenceDiagram
+    autonumber
+    box Arbitrary node
+        participant arb_cm as Consensus Module
+        participant arb_archive as Archive
+    end
+
+    box Standby node
+        participant standby_standby as Cluster Standby
+        participant standby_archive as Archive
+    end
+
+    note over standby_standby: state=BACKUP_QUERY
+
+    standby_standby->>arb_cm: BackupQuery
+    note over arb_cm, standby_standby: endpoint=ctx.consensusEndpoints[i]<br/>stream=ctx.consensusStreamId (108)
+
+    arb_cm->>standby_standby: BackupResponse
+    note over arb_cm, standby_standby: endpoint=ctx.consensusResponseEndpoint<br/>stream=ctx.consensusStreamId (108)
+
+    standby_standby->>standby_standby: state=CLUSTER_ARCHIVE_CONNECT

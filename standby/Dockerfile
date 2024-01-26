@@ -6,7 +6,7 @@ FROM ${REPO_NAME}${IMAGE_NAME}:${IMAGE_TAG}
 SHELL [ "/bin/bash", "-o", "pipefail", "-c" ]
 
 # Create aeron user and group
-RUN groupadd -r aeron && useradd --no-log-init -r -g aeron aeron \
+RUN groupadd -r aeron && useradd --no-log-init -r -g aeron aeron
 
 # Create home directory for aeron
 RUN mkdir /home/aeron && chown aeron:aeron /home/aeron
@@ -30,5 +30,7 @@ RUN /root/dockerbuild/setup-docker.sh && rm --recursive --force "/root/dockerbui
 WORKDIR /home/aeron/jar/
 COPY --chmod=755 /build/libs/standby-uber.jar /home/aeron/jar/standby-uber.jar
 COPY --chmod=755 entrypoint.sh /home/aeron/jar/entrypoint.sh
+COPY --chown=aeron:aeron --chmod=755 aeronstat_single.sh /home/aeron/jar/aeronstat_single.sh
+COPY --chown=aeron:aeron --chmod=755 premiumclustertool.sh /home/aeron/jar/premiumclustertool.sh
 
 ENTRYPOINT ["/home/aeron/jar/entrypoint.sh"]

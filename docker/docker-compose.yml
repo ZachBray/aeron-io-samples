@@ -6,6 +6,8 @@ services:
       context: ../cluster
     hostname: cluster0
     shm_size: '1gb'
+    volumes:
+      - ~/src/data/aeron-io/node0:/home/aeron/jar/aeron-cluster:rw
     networks:
       internal_bus:
         ipv4_address: 172.16.202.2
@@ -19,6 +21,8 @@ services:
       context: ../cluster
     hostname: cluster1
     shm_size: '1gb'
+    volumes:
+      - ~/src/data/aeron-io/node1:/home/aeron/jar/aeron-cluster:rw
     networks:
       internal_bus:
         ipv4_address: 172.16.202.3
@@ -32,6 +36,8 @@ services:
       context: ../cluster
     hostname: cluster2
     shm_size: '1gb'
+    volumes:
+      - ~/src/data/aeron-io/node2:/home/aeron/jar/aeron-cluster:rw
     networks:
       internal_bus:
         ipv4_address: 172.16.202.4
@@ -75,6 +81,7 @@ services:
       - DUMB_TERMINAL=true
       - CLUSTER_ADDRESSES=172.16.202.2,172.16.202.3,172.16.202.4
   backup:
+    profiles: ["backup"]
     build:
       context: ../backup
     hostname: backup
@@ -91,7 +98,9 @@ services:
     build:
       context: ../standby
     hostname: backup
-    shm_size: '1gb'
+    shm_size: '3gb'
+    volumes:
+      - ~/src/data/aeron-io/standby:/home/aeron/jar/node4:rw
     networks:
       internal_bus:
         ipv4_address: 172.16.202.30

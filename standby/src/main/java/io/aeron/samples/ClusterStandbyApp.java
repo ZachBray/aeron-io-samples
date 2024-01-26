@@ -22,6 +22,8 @@ import io.aeron.archive.ArchivingMediaDriver;
 import io.aeron.archive.client.AeronArchive;
 import io.aeron.cluster.ClusterBackup;
 import io.aeron.cluster.ClusterStandby;
+import io.aeron.cluster.ConsensusModule;
+import io.aeron.cluster.TransitionModule;
 import io.aeron.cluster.service.ClusteredServiceContainer;
 import io.aeron.driver.MediaDriver;
 import io.aeron.samples.cluster.ClusterConfig;
@@ -55,7 +57,7 @@ public class ClusterStandbyApp
      *
      * @param args command line args
      */
-    @SuppressWarnings("UnnecessaryLocalVariable")
+    @SuppressWarnings({"UnnecessaryLocalVariable", "MethodLength"})
     public static void main(final String[] args)
     {
         final ShutdownSignalBarrier barrier = new ShutdownSignalBarrier();
@@ -72,7 +74,6 @@ public class ClusterStandbyApp
         final String standbyArchiveEndpoint = standbyHost + ":" + ClusterConfig.calculatePort(
             standbyMemberId, basePort, ARCHIVE_CONTROL_PORT_OFFSET);
         final String standbyDynamicEndpoint = standbyHost + ":0";
-        final String standbyResponseEndpoint = standbyDynamicEndpoint;
         final String clusterConsensusEndpoints = getClusterConsensusEndpoints();
 
         final AeronArchive.Context replicationArchiveContext = new AeronArchive.Context()
@@ -104,21 +105,50 @@ public class ClusterStandbyApp
             .standbyConsensusEndpoint(standbyConsensusEndpoint)    // Used for daisy-chained standbys to retrieve backup
                                                                    // query responses.
             .standbyArchiveEndpoint(standbyArchiveEndpoint)        // The endpoint for this standby's archive.
-            .responseEndpoint(standbyResponseEndpoint)             // The endpoint that receives responses to requests
-                                                                   // (e.g backup queries).
+
+//            .responseEndpoint(standbyResponseEndpoint)             // The endpoint that receives responses to requests
+//                                                                   // (e.g backup queries).
+            .clusterConsensusResponseEndpoint(standbyHost + ":9950")
+            .clusterArchiveResponseEndpoint(standbyHost + ":9951")
+            .catchupEndpoint(standbyHost + ":9952")
+
             .standbyDir(new File(baseDir, "standby"))
             .archiveContext(aeronArchiveContext.clone())
             .aeronDirectoryName(aeronDirectoryName)
             .sourceType(ClusterBackup.SourceType.FOLLOWER) // What kind of node(s) to connect to.
             .standbySnapshotEnabled(true)
-            .standbySnapshotNotificationsEnabled(true)
+            .standbySnapshotNotificationsEnabled(false)
             .deleteDirOnStart(true);
+
+        final String singleNodeClusterMembers =
+            standbyMemberId + "," +
+            standbyHost + ":9002," +
+            standbyHost + ":20220," +
+            standbyHost + ":20330," +
+            standbyHost + ":20440," +
+            standbyHost + ":8010";
+
+        final ConsensusModule.Context consensusModuleContext = new ConsensusModule.Context()
+            .clusterDir(new File(baseDir, ClusterConfig.CLUSTER_SUB_DIR))
+            .clusterMemberId(standbyMemberId)
+            .clusterMembers(singleNodeClusterMembers)
+            .ingressChannel("aeron:udp")
+            .aeronDirectoryName(aeronDirectoryName)
+            .replicationChannel("aeron:udp?endpoint=localhost:0")
+            .archiveContext(aeronArchiveContext.clone());
+
+        final TransitionModule.Context transitionModuleContext = new TransitionModule.Context()
+            .aeronDirectoryName(aeronDirectoryName)
+            .clusterStandbyContext(clusterStandbyContext)
+            .consensusModuleContext(consensusModuleContext)
+            .transitionDir(new File(baseDir, "transition"));
 
         final ClusteredServiceContainer.Context clusteredServiceContext = new ClusteredServiceContainer.Context()
             .aeronDirectoryName(aeronDirectoryName)
             .archiveContext(aeronArchiveContext.clone())
             .clusterDir(new File(baseDir, ClusterConfig.CLUSTER_SUB_DIR))
             .clusteredService(new AppClusteredService())
+            .standbySnapshotEnabled(true)
             .serviceId(0);
 
         LOGGER.info("Standby Directory: {} ", clusterStandbyContext.standbyDirectoryName());
@@ -127,7 +157,7 @@ public class ClusterStandbyApp
 
         try (
             ArchivingMediaDriver ignored = ArchivingMediaDriver.launch(mediaDriverContext, archiveContext);
-            ClusterStandby ignored1 = ClusterStandby.launch(clusterStandbyContext);
+            TransitionModule ignored1 = TransitionModule.launch(transitionModuleContext);
             ClusteredServiceContainer ignored2 = ClusteredServiceContainer.launch(clusteredServiceContext))
         {
             LOGGER.info("Started Cluster Standby...");

@@ -1,0 +1,40 @@
+sequenceDiagram
+    autonumber
+    box Arbitrary node
+        participant arb_cm as Consensus Module
+        participant arb_archive as Archive
+    end
+
+    box Standby node
+        participant standby_standby as Cluster Standby
+        participant standby_archive as Archive
+    end
+    note over standby_standby: state=state=SNAPSHOT_RETREIVE
+
+    standby_standby ->> arb_archive: StartPositionRequest
+    arb_archive ->> standby_standby: ControlResponse(OK)
+
+    alt startPos != 0<br/>|| snapshot exists at pos 0<br/>|| snapshot available before ctx.clusterReplayInitialLogPosition
+        note over standby_standby: select desired snapshot position<br/>from BackupResponse
+
+        loop for each snapshot (incl. CM)
+            standby_standby ->> standby_archive: ReplicateRequest2
+            standby_archive ->> standby_standby: ControlResponse(OK)
+            standby_archive ->> arb_archive: AuthConnectRequest
+            arb_archive ->> standby_archive: ControlResponse(OK)
+            standby_archive ->> arb_archive: ListRecordingRequest
+            arb_archive ->> standby_archive: RecordingDescriptor
+            standby_archive ->> arb_archive: ReplayRequest
+            arb_archive ->> standby_archive: ControlResponse(OK)
+
+            loop
+                arb_archive ->> standby_archive: (Snapshot data)
+                note over arb_archive, standby_archive: endpoint=ctx.catchupEndpoint<br/>stream=from recording (106 or 107)
+            end
+
+            standby_archive ->> standby_standby: RecordingEventSignal(SYNC)
+            standby_archive ->> standby_standby: RecordingEventSignal(REPLICATE_END)
+        end
+    end
+
+    standby_standby ->> standby_standby: state=SETUP_LOG

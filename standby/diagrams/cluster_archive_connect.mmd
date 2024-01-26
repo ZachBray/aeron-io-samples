@@ -1,0 +1,23 @@
+sequenceDiagram
+    autonumber
+    box Arbitrary node
+        participant arb_cm as Consensus Module
+        participant arb_archive as Archive
+    end
+
+    box Standby node
+        participant standby_standby as Cluster Standby
+        participant standby_archive as Archive
+    end
+
+    note over standby_standby: state=BACKUP_QUERY
+    standby_standby ->> arb_archive: AuthConnectRequest
+    note over arb_archive, standby_standby: endpoint=(from BackupResponse)<br/>stream=ctx.cAC.ctrlReqStreamId (10)
+    arb_archive ->> standby_standby: ControlResponse(OK)
+    note over arb_archive, standby_standby: endpoint=ctx.clusterArchiveResponseEndpoint<br/>stream=ctx.cAC.ctrlRespStreamId (20)
+
+    alt no existing term in recording log
+        standby_standby ->> standby_standby: state=SNAPSHOT_RETREIVE
+    else
+        standby_standby ->> standby_standby: state=SETUP_LOG
+    end

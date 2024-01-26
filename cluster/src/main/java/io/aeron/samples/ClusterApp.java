@@ -16,7 +16,14 @@
 
 package io.aeron.samples;
 
-import static java.lang.Integer.parseInt;
+import io.aeron.cluster.ClusteredMediaDriver;
+import io.aeron.cluster.service.ClusteredServiceContainer;
+import io.aeron.samples.cluster.ClusterConfig;
+import io.aeron.samples.infra.AppClusteredService;
+import org.agrona.concurrent.ShutdownSignalBarrier;
+import org.agrona.concurrent.SystemEpochClock;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.net.InetAddress;
@@ -24,15 +31,7 @@ import java.net.UnknownHostException;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import org.agrona.concurrent.ShutdownSignalBarrier;
-import org.agrona.concurrent.SystemEpochClock;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import io.aeron.cluster.ClusteredMediaDriver;
-import io.aeron.cluster.service.ClusteredServiceContainer;
-import io.aeron.samples.cluster.ClusterConfig;
-import io.aeron.samples.infra.AppClusteredService;
+import static java.lang.Integer.parseInt;
 
 /**
  * Sample cluster application
@@ -55,7 +54,10 @@ public class ClusterApp
         final List<String> hostAddresses = List.of(hosts.split(","));
         final ClusterConfig clusterConfig = ClusterConfig.create(nodeId, hostAddresses, hostAddresses, portBase,
             new AppClusteredService());
-        clusterConfig.consensusModuleContext().ingressChannel("aeron:udp");
+        clusterConfig.consensusModuleContext()
+            .ingressChannel("aeron:udp")
+            .authorisationServiceSupplier(MorePermissiveAuthorisationServiceSupplier.INSTANCE)
+            .acceptStandbySnapshots(true);
         clusterConfig.baseDir(getBaseDir(nodeId));
 
         //this may need tuning for your environment.

@@ -34,6 +34,7 @@ COPY --chown=aeron:aeron --chmod=755 streamstat.sh /home/aeron/jar/streamstat.sh
 COPY --chown=aeron:aeron --chmod=755 stackdump.sh /home/aeron/jar/stackdump.sh
 COPY --chown=aeron:aeron --chmod=755 clustererrors.sh /home/aeron/jar/clustererrors.sh
 COPY --chown=aeron:aeron --chmod=755 noderole.sh /home/aeron/jar/noderole.sh
+COPY --chown=aeron:aeron --chmod=755 premiumclustertool.sh /home/aeron/jar/premiumclustertool.sh
 
 # Set the user to aeron
 USER aeron

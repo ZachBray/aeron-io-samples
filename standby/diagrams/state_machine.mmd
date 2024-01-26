@@ -1,0 +1,37 @@
+stateDiagram-v2
+    state normal {
+        [*] --> BACKUP_QUERY
+        note right of BACKUP_QUERY: select arbitrary source<br/>query for snapshots + log recording id + commit pos counter id
+        BACKUP_QUERY --> CLUSTER_ARCHIVE_CONNECT
+        note right of CLUSTER_ARCHIVE_CONNECT: connect to source's archive
+        CLUSTER_ARCHIVE_CONNECT --> SNAPSHOT_RETRIEVE
+        note right of SNAPSHOT_RETRIEVE: replicate _relevant_ snapshots<br/>this might depend on your context values
+        SNAPSHOT_RETRIEVE --> SETUP_LOG
+        note right of SETUP_LOG: set up a bounded replay of the log up to the commit pos
+        CLUSTER_ARCHIVE_CONNECT --> SETUP_LOG
+        SETUP_LOG --> RECOVER_CONSENSUS_MODULE: consensus state == INIT
+        note right of RECOVER_CONSENSUS_MODULE: update recording log,<br/>replay CM snapshot,<br/>allocate recovery state counter (read by CSC),<br/>wait for CSC to replay CSC snapshot and ACK
+        RECOVER_CONSENSUS_MODULE --> LIVE_LOG_REPLAY
+        SETUP_LOG --> LIVE_LOG_REPLAY: consensus state != INIT
+        note right of LIVE_LOG_REPLAY: replay log recording into ClusterStandby,<br/>tell CSC to join log,<br/>wait for ACK
+        LIVE_LOG_REPLAY --> BACKING_UP
+        BACKING_UP --> HEARTBEAT_CLUSTER: commit position stalled
+        HEARTBEAT_CLUSTER --> BACKING_UP: heartbeat received
+        note right of HEARTBEAT_CLUSTER: N.B., heartbeats require authorisation
+    }
+
+    BACKUP_QUERY --> STOPPING_FOR_EXPORT: STOP_FOR_EXPORT control signal
+    BACKING_UP --> STOPPING_FOR_EXPORT: STOP_FOR_EXPORT control signal
+    HEARTBEAT_CLUSTER --> STOPPING_FOR_EXPORT: STOP_FOR_EXPORT control signal
+    note right of STOPPING_FOR_EXPORT: stop log recording,<br/>process log up to stop pos,<br/>request and wait for ACK from CSC,<br/>export state for priming a ConsensusModule
+    STOPPING_FOR_EXPORT --> CLOSED
+    BACKING_UP --> RESET_BACKUP: log image unavailable
+    HEARTBEAT_CLUSTER --> RESET_BACKUP: timeout
+    normal --> RESET_BACKUP: uncaught exception
+    note right of RESET_BACKUP: reset all state.
+    RESET_BACKUP --> normal
+    normal --> TERMINATING: ABORT control signal
+    TERMINATING --> CLOSED
+    CLOSED --> [*]
+
+

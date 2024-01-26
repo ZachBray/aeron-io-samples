@@ -21,6 +21,7 @@ plugins {
 dependencies {
     implementation(libs.agrona)
     implementation(libs.aeron)
+    implementation(libs.clusterStandby)
     implementation(libs.slf4j)
     implementation(libs.logback)
     implementation(project(":cluster-protocol"))
@@ -51,4 +52,17 @@ tasks {
         })
     }
 
+}
+
+repositories {
+    maven {
+        url = uri("https://weareadaptive.jfrog.io/artifactory/aeron-premium")
+        credentials {
+            username = providers.gradleProperty("adaptive_username").get()
+            password = providers.gradleProperty("adaptive_password").get()
+        }
+        content {
+            includeModule("io.aeron", "aeron-cluster-standby")
+        }
+    }
 }
